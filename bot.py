@@ -165,6 +165,11 @@ class MainCog(commands.Cog):
         # TODO: Configurable emoji
 
         channel = self.bot.get_channel(raw_reaction.channel_id)
+        guild = channel.guild
+        # Skip reactions in the archive channel
+        if raw_reaction.channel_id == self.read_config(guild, "archive_channel"):
+            return
+
         message_id = raw_reaction.message_id
         try:
             message = await channel.fetch_message(message_id)
@@ -174,7 +179,6 @@ class MainCog(commands.Cog):
         except discord.Forbidden:
             return
 
-        guild = channel.guild
 
         reaction = discord.utils.get(message.reactions, emoji='📌')
         if reaction is None:
