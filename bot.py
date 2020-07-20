@@ -78,14 +78,14 @@ class MainCog(commands.Cog):
     async def archive_message(self, message: discord.Message):
         """Forwards a message to the archive channel."""
 
-        if "archive_channel" not in self.config_cache:
+        channel_id = self.read_config(message.guild, "archive_channel")
+        if channel_id is None:
             await message.channel.send(
-                "Bot not initialized. Use +init <pin archive channel> to initialize."
-            )
+                    "Bot not initialized. Use +init <pin archive channel> to initialize."
+                )
             return
 
-        channel = self.bot.get_channel(
-            self.read_config(message.guild, "archive_channel"))
+        channel = self.bot.get_channel(channel_id)
         name = message.author.display_name
         avatar = message.author.avatar_url
         pin_content = message.content
@@ -128,7 +128,8 @@ class MainCog(commands.Cog):
         """Archive a message.
         
         The message gets converted using discord.MessageConverter."""
-        await self.archive_message(message)
+        if ctx.message.channel.permissions_for(ctx.message.author).manage_messages:
+            await self.archive_message(message)
 
     @commands.command()
     async def setreactcount(self, ctx, count: int):
@@ -141,6 +142,12 @@ class MainCog(commands.Cog):
         """Get the reaction count threshold."""
         count = self.get_react_count(ctx.guild)
         await ctx.send(f"Reaction count is {count} :pushpin:")
+
+    async def maybe_unpin(self, channel):
+        """Unpin a message from a channel if we're at the 50-message limit."""
+        pins = await channel.pins()
+        if len(pins) > 48:  # some leeway
+            await pins[-1].unpin()
 
     @commands.Cog.listener()
     async def on_raw_reaction_add(
@@ -164,6 +171,7 @@ class MainCog(commands.Cog):
             return
 
         if reaction.count >= self.get_react_count(reaction.message.guild):
+            await self.maybe_unpin()
             await reaction.message.pin()
 
     @commands.Cog.listener()
