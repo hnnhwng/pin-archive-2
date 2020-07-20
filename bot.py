@@ -120,6 +120,9 @@ class MainCog(commands.Cog):
     @commands.command()
     async def init(self, ctx, pin_channel: discord.TextChannel):
         """Initialize the bot with the given pin-archive channel."""
+        if not ctx.message.channel.permissions_for(
+                ctx.message.author).manage_messages:
+            return
         self.save_config(ctx.guild, "archive_channel", pin_channel.id)
         await ctx.send(f"Set archive channel to #{pin_channel}")
 
@@ -128,13 +131,19 @@ class MainCog(commands.Cog):
         """Archive a message.
         
         The message gets converted using discord.MessageConverter."""
-        if ctx.message.channel.permissions_for(
+        if not ctx.message.channel.permissions_for(
                 ctx.message.author).manage_messages:
-            await self.archive_message(message)
+            return
+
+        await self.archive_message(message)
 
     @commands.command()
     async def setreactcount(self, ctx, count: int):
         """Set the reaction count threshold."""
+        if not ctx.message.channel.permissions_for(
+                ctx.message.author).manage_messages:
+            return
+
         self.save_config(ctx.guild, "reaction_count", count)
         await ctx.send(f"Set reaction count to {count} :pushpin:")
 
