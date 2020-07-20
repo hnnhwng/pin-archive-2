@@ -81,8 +81,8 @@ class MainCog(commands.Cog):
         channel_id = self.read_config(message.guild, "archive_channel")
         if channel_id is None:
             await message.channel.send(
-                    "Bot not initialized. Use +init <pin archive channel> to initialize."
-                )
+                "Bot not initialized. Use +init <pin archive channel> to initialize."
+            )
             return
 
         channel = self.bot.get_channel(channel_id)
@@ -128,7 +128,8 @@ class MainCog(commands.Cog):
         """Archive a message.
         
         The message gets converted using discord.MessageConverter."""
-        if ctx.message.channel.permissions_for(ctx.message.author).manage_messages:
+        if ctx.message.channel.permissions_for(
+                ctx.message.author).manage_messages:
             await self.archive_message(message)
 
     @commands.command()
@@ -171,7 +172,7 @@ class MainCog(commands.Cog):
             return
 
         if reaction.count >= self.get_react_count(reaction.message.guild):
-            await self.maybe_unpin()
+            await self.maybe_unpin(channel)
             await reaction.message.pin()
 
     @commands.Cog.listener()
