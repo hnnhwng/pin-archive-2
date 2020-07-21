@@ -90,7 +90,6 @@ class MainCog(commands.Cog):
         avatar = message.author.avatar_url
         pin_content = message.content
         server = message.guild.id
-        # TODO: try to clean up this timestamp
 
         emb = discord.Embed(description=pin_content,
                             color=0x7289da,
