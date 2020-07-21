@@ -91,11 +91,10 @@ class MainCog(commands.Cog):
         pin_content = message.content
         server = message.guild.id
         # TODO: try to clean up this timestamp
-        current_date = datetime.datetime.utcfromtimestamp(int(time.time()))
 
         emb = discord.Embed(description=pin_content,
                             color=0x7289da,
-                            timestamp=current_date)
+                            timestamp=message.created_at)
 
         emb.set_author(
             name=name,
