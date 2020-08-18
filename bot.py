@@ -111,17 +111,17 @@ class MainCog(commands.Cog):
         embed.set_author(name=name, url=message_url, icon_url=avatar_url)
         embed.set_footer(text=f"Sent in {message.channel.name}")
 
-
         if message.embeds:
             thumbnail = message.embeds[0].thumbnail
-            # If the thumbnail URL appears in the message, we can directly
-            # set it as the image of the embed
-            if thumbnail.url in message.content:
-                embed.set_image(url=thumbnail.url)
-            # Otherwise, it's not direct link to an image, so we set it as the
-            # thumbnail of the embed instead
-            else:
-                embed.set_thumbnail(url=thumbnail.url)
+            if thumbnail.url:
+                # If the thumbnail URL appears in the message, we can directly
+                # set it as the image of the embed
+                if thumbnail.url and thumbnail.url in message.content:
+                    embed.set_image(url=thumbnail.url)
+                # Otherwise, it's not direct link to an image, so we set it as the
+                # thumbnail of the embed instead
+                else:
+                    embed.set_thumbnail(url=thumbnail.url)
 
         attachments = message.attachments
 
