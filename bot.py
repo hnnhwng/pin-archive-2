@@ -18,7 +18,7 @@ DEFAULT_REACTS = 7
 
 def guild_save_config(config_path: str, guild_id: int, key: str, value):
     """Save a config value for a guild.
-    
+
     - config_path: path to the config directory
     - guild_id: id as integer
     - key: string key of the config value to save
@@ -62,7 +62,7 @@ class MainCog(commands.Cog):
 
     def save_config(self, guild: discord.Guild, key: str, value):
         """Save a config value for a guild with the given key-value.'
-        
+
         Anything pickleable can be saved."""
         self.config_cache[key] = value
         guild_save_config(self.config_path, guild.id, key, value)
@@ -87,10 +87,12 @@ class MainCog(commands.Cog):
                 "Bot not initialized. Use +init <pin archive channel> to initialize."
             )
             return
+        channel = self.bot.get_channel(channel_id)
 
         name = message.author.display_name
-        avatar = message.author.avatar_url
-        pin_content = message.content
+        avatar_url = message.author.avatar_url
+        server = message.guild.id
+        message_url = f"https://discordapp.com/channels/{server}/{message.channel.id}/{message.id}"
 
         webhook = self.read_config(message.guild, "webhook_url")
 
@@ -101,29 +103,47 @@ class MainCog(commands.Cog):
         webhook = discord.Webhook.from_url(webhook,
                                            adapter=self.webhook_adapter)
 
+        embed = discord.Embed(title=f"📩",
+                              url=message_url,
+                              description=message.content,
+                              timestamp=message.created_at,
+                              color=0x7289da)
+        embed.set_author(name=name, url=message_url, icon_url=avatar_url)
+        embed.set_footer(text=f"Sent in {message.channel.name}")
 
-        server = message.guild.id
-        message_url = f"https://discordapp.com/channels/{server}/{message.channel.id}/{message.id}"
-
-        webhook_message = {
-            "content": message.content + "\n> " + message_url,
-            "wait": False,
-            "username": name,
-            "avatar_url": avatar
-        }
 
         if message.embeds:
-            # Heuristic: if the embed URL is in the message content already,
-            # don't create an embed and allow discord to automatically
-            # convert to an embed
-            webhook_message["embeds"] = [
-                embed for embed in message.embeds
-                if embed.url not in message.content
-            ]
+            thumbnail = message.embeds[0].thumbnail
+            # If the thumbnail URL appears in the message, we can directly
+            # set it as the image of the embed
+            if thumbnail.url in message.content:
+                embed.set_image(url=thumbnail.url)
+            # Otherwise, it's not direct link to an image, so we set it as the
+            # thumbnail of the embed instead
+            else:
+                embed.set_thumbnail(url=thumbnail.url)
 
-        if message.attachments:
-            webhook_message["files"] = [(await attachment.to_file())
-                                        for attachment in message.attachments]
+        attachments = message.attachments
+
+        # Add links to attachments as extra fields
+        for attachment in attachments:
+            embed.add_field(name="🔗", value=attachment.url)
+
+        # TODO: Set the image to one of the attachments if there are no embeds
+
+        # Heuristic: if the embed URL is in the message content already,
+        # don't create an embed
+        embeds = [embed] + ([
+            embed
+            for embed in message.embeds if embed.url is discord.Embed.Empty
+            or embed.url not in message.content
+        ] or [])
+
+        webhook_message = {
+            "content": f"[Message from {name}]({message_url})",
+            "wait": False,
+            "embeds": embeds
+        }
 
         webhook.send(**webhook_message)
 
@@ -155,7 +175,7 @@ class MainCog(commands.Cog):
     @commands.command()
     async def archive(self, ctx, message: discord.Message):
         """Archive a message.
-        
+
         The message gets converted using discord.MessageConverter."""
         if not ctx.message.channel.permissions_for(
                 ctx.message.author).manage_messages:
@@ -222,7 +242,8 @@ class MainCog(commands.Cog):
         """Listen for the system pins_add message and copy the pinned message to the archive channel."""
         if message.type != discord.MessageType.pins_add:
             return
-        if message.channel.id == self.read_config(message.guild, "archive_channel"):
+        if message.channel.id == self.read_config(message.guild,
+                                                  "archive_channel"):
             return
 
         # TODO: is there a TOCTTOU here?
