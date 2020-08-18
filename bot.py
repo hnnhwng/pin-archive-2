@@ -101,8 +101,12 @@ class MainCog(commands.Cog):
         webhook = discord.Webhook.from_url(webhook,
                                            adapter=self.webhook_adapter)
 
+
+        server = message.guild.id
+        message_url = f"https://discordapp.com/channels/{server}/{message.channel.id}/{message.id}"
+
         webhook_message = {
-            "content": message.content,
+            "content": message.content + "\n> " + message_url,
             "wait": False,
             "username": name,
             "avatar_url": avatar
