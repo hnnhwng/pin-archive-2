@@ -9,6 +9,8 @@ import time
 import discord
 from discord.ext import commands
 
+import requests
+
 import util
 
 DEFAULT_REACTS = 7
@@ -47,6 +49,7 @@ class MainCog(commands.Cog):
         self.bot = bot
         self.config_path = config_path
         self.config_cache = {}
+        self.webhook_adapter = discord.RequestsWebhookAdapter()
 
     def read_config(self, guild: discord.Guild, key: str):
         """Read a config value for a guild at the given key."""
@@ -85,44 +88,65 @@ class MainCog(commands.Cog):
             )
             return
 
-        channel = self.bot.get_channel(channel_id)
         name = message.author.display_name
         avatar = message.author.avatar_url
         pin_content = message.content
-        server = message.guild.id
 
-        emb = discord.Embed(description=pin_content,
-                            color=0x7289da,
-                            timestamp=message.created_at)
+        webhook = self.read_config(message.guild, "webhook_url")
 
-        emb.set_author(
-            name=name,
-            icon_url=avatar,
-            url=
-            f"https://discordapp.com/channels/{server}/{message.channel.id}/{message.id}"
-        )
+        if not webhook:
+            print("No webhook???")
+            return
+
+        webhook = discord.Webhook.from_url(webhook,
+                                           adapter=self.webhook_adapter)
+
+        webhook_message = {
+            "content": message.content,
+            "wait": False,
+            "username": name,
+            "avatar_url": avatar
+        }
+
+        if message.embeds:
+            # Heuristic: if the embed URL is in the message content already,
+            # don't create an embed and allow discord to automatically
+            # convert to an embed
+            webhook_message["embeds"] = [
+                embed for embed in message.embeds
+                if embed.url not in message.content
+            ]
 
         if message.attachments:
-            img_url = message.attachments[0].url
-            emb.set_image(url=img_url)
+            webhook_message["files"] = [(await attachment.to_file())
+                                        for attachment in message.attachments]
 
-        emb.set_footer(text='Sent in #{}'.format(message.channel))
-
-        try:
-            await channel.send(embed=emb)
-        except discord.errors.Forbidden:
-            await message.channel.send(
-                f"Pin Archiver does not have permission to send messages in {channel.name}."
-            )
+        webhook.send(**webhook_message)
 
     @commands.command()
     async def init(self, ctx, pin_channel: discord.TextChannel):
         """Initialize the bot with the given pin-archive channel."""
         if not ctx.message.channel.permissions_for(
-                ctx.message.author).manage_messages:
+                ctx.message.author).administrator:
             return
-        self.save_config(ctx.guild, "archive_channel", pin_channel.id)
-        await ctx.send(f"Set archive channel to #{pin_channel}")
+        guild = ctx.guild
+
+        self.save_config(guild, "archive_channel", pin_channel.id)
+
+        # Create webhook and save it
+        old_webhook_url = self.read_config(guild, "webhook_url")
+        if old_webhook_url:
+            old_webhook = discord.Webhook.from_url(old_webhook_url)
+            old_webhook.delete()
+
+        webhook = await pin_channel.create_webhook(
+            name="Pin Archive 2 Webhook",
+            reason="+init command for pin archiver")
+
+        self.save_config(guild, "webhook_url", webhook.url)
+
+        await ctx.send(
+            f"Set archive channel to #{pin_channel} and created webhook")
 
     @commands.command()
     async def archive(self, ctx, message: discord.Message):
@@ -165,7 +189,8 @@ class MainCog(commands.Cog):
         channel = self.bot.get_channel(raw_reaction.channel_id)
         guild = channel.guild
         # Skip reactions in the archive channel
-        if raw_reaction.channel_id == self.read_config(guild, "archive_channel"):
+        if raw_reaction.channel_id == self.read_config(guild,
+                                                       "archive_channel"):
             return
 
         message_id = raw_reaction.message_id
@@ -177,13 +202,15 @@ class MainCog(commands.Cog):
         except discord.Forbidden:
             return
 
-
         reaction = discord.utils.get(message.reactions, emoji='📌')
         if reaction is None:
             return
 
         if reaction.count >= self.get_react_count(reaction.message.guild):
-            await self.maybe_unpin(channel)
+            # Expensive check that we don't want to run too often
+            if message_id in [message.id for message in await channel.pins()]:
+                print("Not pinning duplicate pin")
+                return
             await reaction.message.pin()
 
     @commands.Cog.listener()
@@ -191,23 +218,19 @@ class MainCog(commands.Cog):
         """Listen for the system pins_add message and copy the pinned message to the archive channel."""
         if message.type != discord.MessageType.pins_add:
             return
-        guild = message.guild
+        if message.channel.id == self.read_config(message.guild, "archive_channel"):
+            return
+
         # TODO: is there a TOCTTOU here?
-        entry = (await
-                 guild.audit_logs(action=discord.AuditLogAction.message_pin,
-                                  limit=1,
-                                  oldest_first=False).flatten())[0]
-        channel, message_id = entry.extra.channel, entry.extra.message_id
-        message = await channel.fetch_message(message_id)
+        message = (await message.channel.pins())[0]
+        await self.maybe_unpin(message.channel)
         await self.archive_message(message)
 
     @commands.Cog.listener()
     async def on_guild_channel_pins_update(self,
                                            channel: discord.abc.GuildChannel,
                                            last_pin: datetime.datetime):
-        if last_pin is None:
-            return
-        print(last_pin)
+        pass
 
 
 def main():
