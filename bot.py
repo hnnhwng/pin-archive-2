@@ -103,7 +103,7 @@ class MainCog(commands.Cog):
         webhook = discord.Webhook.from_url(webhook,
                                            adapter=self.webhook_adapter)
 
-        embed = discord.Embed(title=f"📩",
+        embed = discord.Embed(
                               url=message_url,
                               description=message.content,
                               timestamp=message.created_at,
