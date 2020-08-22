@@ -2,6 +2,7 @@ import argparse
 import configparser
 import datetime
 import functools
+import mimetypes
 import os
 import pickle
 import time
@@ -110,6 +111,7 @@ class MainCog(commands.Cog):
                               color=0x7289da)
         embed.set_author(name=name, url=message_url, icon_url=avatar_url)
         embed.set_footer(text=f"Sent in {message.channel.name}")
+        attachments = message.attachments
 
         if message.embeds:
             thumbnail = message.embeds[0].thumbnail
@@ -122,14 +124,17 @@ class MainCog(commands.Cog):
                 # thumbnail of the embed instead
                 else:
                     embed.set_thumbnail(url=thumbnail.url)
+        elif attachments:
+            # Set the first image attachment as the embed image
+            for attachment in attachments:
+                if mimetypes.guess_type(attachment.filename)[0].startswith("image/"):
+                    embed.set_image(url=attachment.url)
+                    break
 
-        attachments = message.attachments
 
         # Add links to attachments as extra fields
         for attachment in attachments:
             embed.add_field(name="🔗", value=attachment.url)
-
-        # TODO: Set the image to one of the attachments if there are no embeds
 
         # Heuristic: if the embed URL is in the message content already,
         # don't create an embed
