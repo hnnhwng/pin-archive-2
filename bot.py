@@ -54,18 +54,24 @@ class MainCog(commands.Cog):
 
     def read_config(self, guild: discord.Guild, key: str):
         """Read a config value for a guild at the given key."""
+        if guild.id not in self.config_cache:
+            self.config_cache[guild.id] = {}
+
         try:
-            return self.config_cache[key]
+            return self.config_cache[guild.id][key]
         except KeyError:
             value = guild_read_config(self.config_path, guild.id, key)
-            self.config_cache[key] = value
+            self.config_cache[guild.id][key] = value
             return value
 
     def save_config(self, guild: discord.Guild, key: str, value):
         """Save a config value for a guild with the given key-value.'
 
         Anything pickleable can be saved."""
-        self.config_cache[key] = value
+        if guild.id not in self.config_cache:
+            self.config_cache[guild.id] = {}
+
+        self.config_cache[guild.id][key] = value
         guild_save_config(self.config_path, guild.id, key, value)
 
     def get_react_count(self, guild: discord.Guild):
