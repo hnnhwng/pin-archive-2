@@ -109,8 +109,7 @@ class MainCog(commands.Cog):
         webhook = discord.Webhook.from_url(webhook,
                                            adapter=self.webhook_adapter)
 
-        embed = discord.Embed(
-                              url=message_url,
+        embed = discord.Embed(url=message_url,
                               description=message.content,
                               timestamp=message.created_at,
                               color=0x7289da)
@@ -132,10 +131,10 @@ class MainCog(commands.Cog):
         elif attachments:
             # Set the first image attachment as the embed image
             for attachment in attachments:
-                if mimetypes.guess_type(attachment.filename)[0].startswith("image/"):
+                if mimetypes.guess_type(
+                        attachment.filename)[0].startswith("image/"):
                     embed.set_image(url=attachment.url)
                     break
-
 
         # Add links to attachments as extra fields
         for attachment in attachments:
@@ -170,8 +169,8 @@ class MainCog(commands.Cog):
         # Create webhook and save it
         old_webhook_url = self.read_config(guild, "webhook_url")
         if old_webhook_url:
-            old_webhook = discord.Webhook.from_url(old_webhook_url
-                                                   adapter=self.webhook_adapter)
+            old_webhook = discord.Webhook.from_url(
+                old_webhook_url, adapter=self.webhook_adapter)
             old_webhook.delete()
 
         webhook = await pin_channel.create_webhook(
