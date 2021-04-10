@@ -94,7 +94,6 @@ class MainCog(commands.Cog):
                 "Bot not initialized. Use +init <pin archive channel> to initialize."
             )
             return
-        channel = self.bot.get_channel(channel_id)
 
         name = message.author.display_name
         avatar_url = message.author.avatar_url
