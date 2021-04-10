@@ -275,35 +275,6 @@ class MainCog(commands.Cog):
             await message.pin()
             await self.archive_message(message)
 
-    @commands.Cog.listener()
-    async def on_message(self, message: discord.Message):
-        """Listen for the system pins_add message and copy the pinned message to the archive channel."""
-        if message.type != discord.MessageType.pins_add:
-            return
-        if message.channel.id == self.read_config(message.guild,
-                                                  "archive_channel"):
-            return
-
-        # TODO FIXME: There is a race condition if too many messages get pinned
-        # at the same time. Only the latest message will get pinned.
-        message_to_pin = (await message.channel.pins())[0]
-        # The message object from pins() is missing reactions so we need to fetch again.
-        message_to_pin = await get_message_by_id(message.channel,
-                                                 message_to_pin.id)
-
-        if already_pinned(message_to_pin):
-            return
-
-        await set_pinned(message_to_pin)
-        await self.maybe_unpin(message.channel)
-        await self.archive_message(message_to_pin)
-
-    @commands.Cog.listener()
-    async def on_guild_channel_pins_update(self,
-                                           channel: discord.abc.GuildChannel,
-                                           last_pin: datetime.datetime):
-        pass
-
 
 def main():
     parser = argparse.ArgumentParser()
