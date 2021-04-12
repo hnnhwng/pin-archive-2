@@ -171,7 +171,7 @@ class MainCog(commands.Cog):
         # Create webhook and save it
         old_webhook_url = self.read_config(guild, "webhook_url")
         if old_webhook_url:
-            old_webhook = discord.Webhook.from_url(old_webhook_url
+            old_webhook = discord.Webhook.from_url(old_webhook_url,
                                                    adapter=self.webhook_adapter)
             old_webhook.delete()
 
