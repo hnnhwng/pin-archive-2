@@ -275,6 +275,24 @@ class MainCog(commands.Cog):
             await message.pin()
             await self.archive_message(message)
 
+    @commands.Cog.listener()
+    async def on_message(self, message: discord.Message):
+        """Listen for the system pins_add message and copy the pinned message
+        to the archive channel."""
+        if message.type != discord.MessageType.pins_add:
+            return
+        if message.channel.id == self.read_config(message.guild,
+                                                  "archive_channel"):
+            return
+
+        reference = message.reference
+
+        channel = self.bot.get_channel(reference.channel_id)
+        message = await channel.fetch_message(reference.message_id)
+
+        await self.maybe_unpin(message.channel)
+        await self.archive_message(message)
+
 
 def main():
     parser = argparse.ArgumentParser()
