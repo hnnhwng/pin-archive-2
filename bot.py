@@ -45,6 +45,40 @@ def guild_read_config(config_path: str, guild_id: int, key: str):
         return None
 
 
+def already_pinned(message: discord.Message):
+    """Check if the message is already pinned by checking for the bot's own reaction."""
+    # To more easily support custom reactions in the future, just check if
+    # there is any reaction at all from the bot.
+    already_pinned = discord.utils.get(message.reactions, me=True)
+    return already_pinned is not None
+
+
+async def set_pinned(message: discord.Message):
+    """Leave a reaction on the message to indicate that it is pinned already."""
+    # TODO: Custom reaction support
+    try:
+        await message.add_reaction('📌')
+    except discord.HTTPException as e:
+        # If for some reason reactions are full and the pushpin isn't present,
+        # just react on the first reaction in the message.
+        if message.reactions:
+            await message.add_reaction(message.reactions[0].emoji)
+        else:
+            print("Unable to react?")
+            print(e)
+
+
+async def get_message_by_id(channel, message_id):
+    try:
+        message = await channel.fetch_message(message_id)
+        return message
+    except discord.NotFound:
+        print(f"Message {message_id} not found")
+        return
+    except discord.Forbidden:
+        return
+
+
 class MainCog(commands.Cog):
     def __init__(self, bot, config_path: str):
         self.bot = bot
@@ -94,7 +128,6 @@ class MainCog(commands.Cog):
                 "Bot not initialized. Use +init <pin archive channel> to initialize."
             )
             return
-        channel = self.bot.get_channel(channel_id)
 
         name = message.author.display_name
         avatar_url = message.author.avatar_url
@@ -110,8 +143,7 @@ class MainCog(commands.Cog):
         webhook = discord.Webhook.from_url(webhook,
                                            adapter=self.webhook_adapter)
 
-        embed = discord.Embed(
-                              url=message_url,
+        embed = discord.Embed(url=message_url,
                               description=message.content,
                               timestamp=message.created_at,
                               color=0x7289da)
@@ -133,10 +165,10 @@ class MainCog(commands.Cog):
         elif attachments:
             # Set the first image attachment as the embed image
             for attachment in attachments:
-                if mimetypes.guess_type(attachment.filename)[0].startswith("image/"):
+                if mimetypes.guess_type(
+                        attachment.filename)[0].startswith("image/"):
                     embed.set_image(url=attachment.url)
                     break
-
 
         # Add links to attachments as extra fields
         for attachment in attachments:
@@ -171,8 +203,8 @@ class MainCog(commands.Cog):
         # Create webhook and save it
         old_webhook_url = self.read_config(guild, "webhook_url")
         if old_webhook_url:
-            old_webhook = discord.Webhook.from_url(old_webhook_url,
-                                                   adapter=self.webhook_adapter)
+            old_webhook = discord.Webhook.from_url(
+                old_webhook_url, adapter=self.webhook_adapter)
             old_webhook.delete()
 
         webhook = await pin_channel.create_webhook(
@@ -220,7 +252,7 @@ class MainCog(commands.Cog):
     @commands.Cog.listener()
     async def on_raw_reaction_add(
             self, raw_reaction: discord.RawReactionActionEvent):
-        # TODO: Configurable emoji
+        # TODO: Custom reaction support
 
         channel = self.bot.get_channel(raw_reaction.channel_id)
         guild = channel.guild
@@ -230,24 +262,18 @@ class MainCog(commands.Cog):
             return
 
         message_id = raw_reaction.message_id
-        try:
-            message = await channel.fetch_message(message_id)
-        except discord.NotFound:
-            print(f"Message {message_id} not found")
-            return
-        except discord.Forbidden:
-            return
-
+        message = await get_message_by_id(channel, message_id)
         reaction = discord.utils.get(message.reactions, emoji='📌')
         if reaction is None:
             return
 
-        if reaction.count >= self.get_react_count(reaction.message.guild):
-            # Expensive check that we don't want to run too often
-            if message_id in [message.id for message in await channel.pins()]:
-                print("Not pinning duplicate pin")
-                return
-            await reaction.message.pin()
+        if already_pinned(message):
+            return
+
+        if reaction.count >= self.get_react_count(message.guild):
+            await set_pinned(message)
+            await message.pin()
+            await self.archive_message(message)
 
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
@@ -255,10 +281,8 @@ class MainCog(commands.Cog):
         if message.type != discord.MessageType.pins_add:
             return
         if message.channel.id == self.read_config(message.guild,
-                                                  "archive_channel"):
             return
 
-        # TODO: is there a TOCTTOU here?
         reference = message.reference
 
         channel = self.bot.get_channel(reference.channel_id)
@@ -266,12 +290,6 @@ class MainCog(commands.Cog):
 
         await self.maybe_unpin(message.channel)
         await self.archive_message(message)
-
-    @commands.Cog.listener()
-    async def on_guild_channel_pins_update(self,
-                                           channel: discord.abc.GuildChannel,
-                                           last_pin: datetime.datetime):
-        pass
 
 
 def main():
@@ -291,7 +309,11 @@ def main():
 
     os.makedirs(config_path, exist_ok=True)
 
-    bot = commands.Bot(command_prefix=prefix)
+    intents = discord.Intents(guild_messages=True,
+                              guild_reactions=True,
+                              guilds=True)
+
+    bot = commands.Bot(command_prefix=prefix, intents=intents)
     bot.add_cog(MainCog(bot, config_path))
     bot.run(token)
 
