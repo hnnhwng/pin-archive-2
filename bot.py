@@ -291,6 +291,7 @@ class MainCog(commands.Cog):
         message = await channel.fetch_message(reference.message_id)
 
         await self.maybe_unpin(message.channel)
+        await set_pinned(message)
         await self.archive_message(message)
 
 
