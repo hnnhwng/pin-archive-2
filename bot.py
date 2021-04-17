@@ -259,7 +259,11 @@ class MainCog(commands.Cog):
             return
 
         # TODO: is there a TOCTTOU here?
-        message = (await message.channel.pins())[0]
+        reference = message.reference
+
+        channel = self.bot.get_channel(reference.channel_id)
+        message = await channel.fetch_message(reference.message_id)
+
         await self.maybe_unpin(message.channel)
         await self.archive_message(message)
 
