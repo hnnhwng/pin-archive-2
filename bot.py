@@ -271,9 +271,7 @@ class MainCog(commands.Cog):
             return
 
         if reaction.count >= self.get_react_count(message.guild):
-            await set_pinned(message)
             await message.pin()
-            await self.archive_message(message)
 
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
