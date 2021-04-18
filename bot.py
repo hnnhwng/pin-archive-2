@@ -53,7 +53,14 @@ def already_pinned(message: discord.Message):
     return already_pinned is not None
 
 
-async def set_pinned(message: discord.Message):
+async def maybe_unpin(message: discord.Message):
+    """Unpin a message from a channel if we're at the 50-message limit."""
+    pins = await message.channel.pins()
+    if len(pins) > 48:  # some leeway
+        await pins[-1].unpin()
+
+
+async def react_as_pinned(message: discord.Message):
     """Leave a reaction on the message to indicate that it is pinned already."""
     # TODO: Custom reaction support
     try:
@@ -243,12 +250,6 @@ class MainCog(commands.Cog):
         count = self.get_react_count(ctx.guild)
         await ctx.send(f"Reaction count is {count} :pushpin:")
 
-    async def maybe_unpin(self, channel):
-        """Unpin a message from a channel if we're at the 50-message limit."""
-        pins = await channel.pins()
-        if len(pins) > 48:  # some leeway
-            await pins[-1].unpin()
-
     @commands.Cog.listener()
     async def on_raw_reaction_add(
             self, raw_reaction: discord.RawReactionActionEvent):
@@ -271,6 +272,7 @@ class MainCog(commands.Cog):
             return
 
         if reaction.count >= self.get_react_count(message.guild):
+            await maybe_unpin(message)
             await message.pin()
 
     @commands.Cog.listener()
@@ -288,8 +290,7 @@ class MainCog(commands.Cog):
         channel = self.bot.get_channel(reference.channel_id)
         message = await channel.fetch_message(reference.message_id)
 
-        await self.maybe_unpin(message.channel)
-        await set_pinned(message)
+        await react_as_pinned(message)
         await self.archive_message(message)
 
 
