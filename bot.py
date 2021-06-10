@@ -287,6 +287,11 @@ class MainCog(commands.Cog):
         channel = self.bot.get_channel(reference.channel_id)
         message = await channel.fetch_message(reference.message_id)
 
+        await maybe_unpin(message)
+
+        if already_pinned(message):
+            return
+
         await react_as_pinned(message)
         await self.archive_message(message)
 
