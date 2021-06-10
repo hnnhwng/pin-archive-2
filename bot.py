@@ -1,16 +1,13 @@
+#!/usr/bin/env python3
+
 import argparse
 import configparser
-import datetime
-import functools
 import mimetypes
 import os
 import pickle
-import time
 
 import discord
 from discord.ext import commands
-
-import requests
 
 import util
 
